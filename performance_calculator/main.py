@@ -1,7 +1,10 @@
+from dotenv import load_dotenv
 import argparse
 import os
 from datetime import datetime, timedelta
 from github import Github, Auth
+
+load_dotenv()  # Load environment variables from .env file
 
 
 def analyze_repository(owner, repo_name, token=None):
