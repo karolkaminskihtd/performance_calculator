@@ -132,6 +132,7 @@ def get_pull_requests(repo):
         pr_list = []
 
         if pulls.totalCount == 0:
+            print("No pull requests found.")
             return {"total_count": 0, "pull_requests": []}
         
         for pr in pulls[:100]:  # Limit to 100 PRs to avoid excessive data
