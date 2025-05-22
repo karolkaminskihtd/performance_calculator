@@ -23,6 +23,8 @@ python = "^3.12"
 
 [tool.poetry.scripts]
 performance-calculator = "performance_calculator.main:main"
+generate-github-builds-raw-data = "performance_calculator.generate_github_builds_raw_data:generate_github_builds_raw_data"
+calculate-github-personal-performance = "performance_calculator.calculate_github_personal_performance:calculate_github_personal_performance"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.5"

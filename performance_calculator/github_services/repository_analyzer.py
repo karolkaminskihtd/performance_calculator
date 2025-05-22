@@ -136,19 +136,18 @@ def get_workflow_runs(repo, created_date=None, limit=None):
         
         for run in workflow_runs[:limit] if limit else workflow_runs:
             pull_requests = run.raw_data.get("pull_requests", [])
+
+            if run.status != "completed":
+                continue
             
             runs.append({
-                "id": run.id,
                 "author": run.actor.login if run.actor else None,
                 "workflow_name": run.name,
                 "pr_name": run.display_title,
-                "status": run.status,
                 "conclusion": run.conclusion,
                 "head_branch": run.head_branch,
                 "base_branch": pull_requests[0].get("base", {}).get("ref", None) if pull_requests else None,
-                "pull_requests_count": len(run.pull_requests),
                 "run_attempt": run.run_attempt,
-                "run_number": run.run_number,
                 "created_at": run.created_at.strftime("%Y-%m-%d %H:%M:%S"),
             })
         
@@ -171,7 +170,7 @@ def get_pull_requests(repo):
             print("No pull requests found.")
             return {"total_count": 0, "pull_requests": []}
         
-        for pr in pulls[:100]:  # Limit to 100 PRs to avoid excessive data
+        for pr in pulls:
             pr_list.append({
                 "number": pr.number,
                 "title": pr.title,
@@ -196,7 +195,7 @@ def get_commits(repo):
         commits = repo.get_commits()
         commit_list = []
         
-        for commit in commits[:100]:  # Limit to 100 commits to avoid excessive data
+        for commit in commits:
             commit_list.append({
                 "sha": commit.sha,
                 "author": commit.author.login if commit.author else "Unknown",

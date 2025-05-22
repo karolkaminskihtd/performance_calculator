@@ -53,8 +53,6 @@ def parsed_arguments():
     output_group = parser.add_argument_group('Output options')
     output_group.add_argument('--output',
                           help='Save results to the specified JSON file')
-    output_group.add_argument('--detailed', action='store_true',
-                          help='Show detailed information about each workflow run')
     output_group.add_argument('--limit', type=int,
                           help='Limit the number of workflow runs to display')
     
