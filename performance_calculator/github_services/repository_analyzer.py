@@ -16,9 +16,6 @@ def get_github_data():
     print("\nRepository Analysis Summary:")
     print(f"Repository: {results['repository']}")
     print(f"URL: {results['url']}")
-    print(f"Stars: {results['stars']}")
-    print(f"Forks: {results['forks']}")
-    print(f"Created: {results['created_at']}")
     print(f"Last Updated: {results['last_updated']}")
     print(f"\nWorkflow Runs (Builds): {results['builds']['total_count']}")
     print(f"Pull Requests: {results['pull_requests']['total_count']}")
@@ -73,9 +70,6 @@ def analyze_repository(owner, repo_name, token=None):
         results = {
             "repository": repo.full_name,
             "url": repo.html_url,
-            "stars": repo.stargazers_count,
-            "forks": repo.forks_count,
-            "created_at": repo.created_at.strftime("%Y-%m-%d"),
             "last_updated": repo.updated_at.strftime("%Y-%m-%d"),
         }
         
@@ -105,6 +99,18 @@ def get_workflow_runs(repo):
     try:
         workflow_runs = repo.get_workflow_runs()
         runs = []
+
+        # Display all attributes of the first workflow run
+        if workflow_runs.totalCount > 0:
+            first_run = workflow_runs[0]
+            print("\nWorkflow Run Attributes:")
+            for attr in dir(first_run):
+                if not attr.startswith('_'):  # Skip private attributes
+                    try:
+                        value = getattr(first_run, attr)
+                        print(f"{attr}: {value}")
+                    except Exception as e:
+                        print(f"{attr}: Error accessing attribute - {e}")
         
         for run in workflow_runs:
             runs.append({
