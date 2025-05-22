@@ -5,43 +5,44 @@ from github import Github, Auth
 
 load_dotenv()
 
-def get_github_data():
+def get_github_data(created_date=None, limit=None):
+    """
+    Get GitHub repository data with optional date filtering.
+    
+    Args:
+        created_date (str, optional): Date string to filter workflow runs.
+            Can be a specific date like "2024-01-24" or date range like "2024-01-01..2024-01-31".
+            Can also use GitHub date qualifiers like "<=2024-01-01" or ">=2023-12-31".
+    
+    Returns:
+        dict: Dictionary containing processed repository data
+    """
     owner = os.environ.get("GITHUB_OWNER")
     repo_name = os.environ.get("GITHUB_REPO")
     token = os.environ.get("GITHUB_TOKEN")
 
-    results = analyze_repository(owner, repo_name, token)
+    if not all([owner, repo_name, token]):
+        print("Error: Missing required environment variables (GITHUB_OWNER, GITHUB_REPO, GITHUB_TOKEN)")
+        return None
 
-    # Display summary results
-    print("\nRepository Analysis Summary:")
-    print(f"Repository: {results['repository']}")
-    print(f"URL: {results['url']}")
-    print(f"Last Updated: {results['last_updated']}")
-    print(f"\nWorkflow Runs (Builds): {results['builds']['total_count']}")
-    print(f"Pull Requests: {results['pull_requests']['total_count']}")
-    print(f"Commits: {results['commits']['total_count']}")
-    print(f"Contributors: {results['contributors']['total_count']}")
+    results = analyze_repository(owner, repo_name, token, created_date, limit)
     
-    # Save to file if specified
-    print("\nRecent Workflow Runs:")
-    for run in results['builds']['runs'][:5]:  # Show 5 most recent
-        print(f"  - {run['workflow_name']} ({run['status']}/{run['conclusion']}) on {run['branch']} at {run['created_at']}")
+    if not results:
+        print("Error: Failed to analyze repository")
+        return None
     
-    print("\nRecent Pull Requests:")
-    for pr in results['pull_requests']['pull_requests'][:5]:  # Show 5 most recent
-        print(f"  - #{pr['number']} {pr['title']} by {pr['user']} ({pr['state']}) created at {pr['created_at']}")
+    # Format the results for return
+    statistics = {
+        'builds': results['builds']['runs'],
+        'repository': results['repository'],
+        'url': results['url'],
+        'total_count': results['builds']['total_count']
+    }
     
-    print("\nRecent Commits:")
-    for commit in results['commits']['commits'][:5]:  # Show 5 most recent
-        print(f"  - {commit['sha'][:7]} {commit['message']} by {commit['author']} at {commit['date']}")
-    
-    print("\nTop Contributors:")
-    sorted_contributors = sorted(results['contributors']['contributors'], key=lambda x: x['contributions'], reverse=True)
-    for contributor in sorted_contributors[:5]:  # Show top 5
-        print(f"  - {contributor['login']} ({contributor['contributions']} contributions)")
+    return statistics
 
 
-def analyze_repository(owner, repo_name, token=None):
+def analyze_repository(owner, repo_name, token=None, created_date=None, limit=None):
     """
     Analyze a GitHub repository to get builds, PRs, commits, and authors.
     
@@ -49,6 +50,9 @@ def analyze_repository(owner, repo_name, token=None):
         owner (str): Repository owner (username or organization).
         repo_name (str): Repository name.
         token (str, optional): GitHub access token for authentication.
+        created_date (str, optional): Date string to filter workflow runs.
+            Can be a specific date like "2024-01-24" or date range like "2024-01-01..2024-01-31".
+            Can also use GitHub date qualifiers like "<2024-01-01" or ">2023-12-31".
         
     Returns:
         dict: Repository analysis results.
@@ -59,8 +63,6 @@ def analyze_repository(owner, repo_name, token=None):
         g = Github(auth=auth)
     else:
         g = Github()  # Unauthenticated, limited API access
-    
-    print(f"Analyzing repository: {owner}/{repo_name}")
     
     try:
         # Get repository
@@ -74,16 +76,16 @@ def analyze_repository(owner, repo_name, token=None):
         }
         
         # Get workflow runs (builds)
-        results["builds"] = get_workflow_runs(repo)
+        results["builds"] = get_workflow_runs(repo, created_date, limit)
         
-        # Get pull requests
-        results["pull_requests"] = get_pull_requests(repo)
+        # # Get pull requests
+        # results["pull_requests"] = get_pull_requests(repo)
         
-        # Get commits
-        results["commits"] = get_commits(repo)
+        # # Get commits
+        # results["commits"] = get_commits(repo)
         
-        # Get authors/contributors
-        results["contributors"] = get_contributors(repo)
+        # # Get authors/contributors
+        # results["contributors"] = get_contributors(repo)
         
         return results
     
@@ -94,37 +96,65 @@ def analyze_repository(owner, repo_name, token=None):
         g.close()  # Close connections after use
 
 
-def get_workflow_runs(repo):
-    """Get workflow runs (builds) for the repository."""
+def get_workflow_runs(repo, created_date=None, limit=None):
+    """
+    Get workflow runs (builds) for the repository.
+    
+    Args:
+        repo: GitHub repository object.
+        created_date (str, optional): Date string to filter workflow runs.
+            Can be a specific date like "2024-01-24" or date range like "2024-01-01..2024-01-31".
+            Can also use GitHub date qualifiers like "<=2024-01-01" or ">=2023-12-31".
+            GitHub query syntax examples:
+            - "2023-01-01"            - Runs created on this specific date
+            - "2023-01-01..2023-01-31" - Runs created in this date range
+            - ">=2023-01-01"          - Runs created on or after this date
+            - "<=2023-01-31"          - Runs created on or before this date
+            - "<2023-02-01"           - Runs created before this date
+            - ">2022-12-31"           - Runs created after this date
+    """
     try:
-        workflow_runs = repo.get_workflow_runs()
+        # Apply created_date filter if specified
+        if created_date:
+            workflow_runs = repo.get_workflow_runs(created=created_date)
+        else:
+            workflow_runs = repo.get_workflow_runs()
+            
         runs = []
-
-        # Display all attributes of the first workflow run
-        if workflow_runs.totalCount > 0:
-            first_run = workflow_runs[0]
-            print("\nWorkflow Run Attributes:")
-            for attr in dir(first_run):
-                if not attr.startswith('_'):  # Skip private attributes
-                    try:
-                        value = getattr(first_run, attr)
-                        print(f"{attr}: {value}")
-                    except Exception as e:
-                        print(f"{attr}: Error accessing attribute - {e}")
         
-        for run in workflow_runs:
+        # Display all attributes of the first workflow run
+        # if workflow_runs.totalCount > 0:
+        #     first_run = workflow_runs[0]
+        #     print("\nWorkflow Run Attributes:")
+        #     for attr in dir(first_run):
+        #         if not attr.startswith('_'):  # Skip private attributes
+        #             try:
+        #                 value = getattr(first_run, attr)
+        #                 print(f"{attr}: {value}")
+        #             except Exception as e:
+        #                 print(f"{attr}: Error accessing attribute - {e}")
+        
+        for run in workflow_runs[:limit] if limit else workflow_runs:
+            pull_requests = run.raw_data.get("pull_requests", [])
+            
             runs.append({
                 "id": run.id,
+                "author": run.actor.login if run.actor else None,
                 "workflow_name": run.name,
+                "pr_name": run.display_title,
                 "status": run.status,
                 "conclusion": run.conclusion,
-                "branch": run.head_branch,
+                "head_branch": run.head_branch,
+                "base_branch": pull_requests[0].get("base", {}).get("ref", None) if pull_requests else None,
+                "pull_requests_count": len(run.pull_requests),
+                "run_attempt": run.run_attempt,
+                "run_number": run.run_number,
                 "created_at": run.created_at.strftime("%Y-%m-%d %H:%M:%S"),
             })
         
         return {
             "total_count": workflow_runs.totalCount,
-            "runs": runs[:100]  # Limit to avoid excessive data
+            "runs": runs
         }
     except Exception as e:
         print(f"Error getting workflow runs: {e}")
